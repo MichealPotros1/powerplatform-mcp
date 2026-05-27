@@ -423,12 +423,4 @@ GitHub Actions will automatically publish:
 
 npm publishing uses [Trusted Publishing (OIDC)](https://docs.npmjs.com/trusted-publishers/) — no tokens or secrets needed. GitHub Packages and GHCR use the built-in `GITHUB_TOKEN` automatically.
 
-## License
-
-MIT
-
-<a href="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@michsob/powerplatform-mcp/badge" alt="PowerPlatform MCP server" />
-</a>
-
-[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/michsob-powerplatform-mcp-badge.png)](https://mseep.ai/app/michsob-powerplatform-mcp)
+ 
