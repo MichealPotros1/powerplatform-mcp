@@ -2,6 +2,36 @@ import type { Command } from 'commander';
 import type { EnvironmentRegistry } from '../../environment-config.js';
 import { outputResult } from '../output.js';
 
+function normalizeName(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function resolveSingleByName<T extends { name: string }>(
+  items: T[],
+  targetName: string,
+  itemType: 'form' | 'view',
+): T {
+  const normalizedTarget = normalizeName(targetName);
+  const exact = items.filter((i) => normalizeName(i.name) === normalizedTarget);
+  if (exact.length === 1) {
+    return exact[0];
+  }
+  if (exact.length > 1) {
+    throw new Error(`Multiple ${itemType}s found with name '${targetName}'. Please use the ID-based command.`);
+  }
+
+  const partial = items.filter((i) => normalizeName(i.name).includes(normalizedTarget));
+  if (partial.length === 1) {
+    return partial[0];
+  }
+  if (partial.length > 1) {
+    const names = partial.map((i) => `  ${i.name}`).join('\n');
+    throw new Error(`Multiple ${itemType}s matched '${targetName}'. Please be more specific:\n${names}`);
+  }
+
+  throw new Error(`No ${itemType} found matching '${targetName}'.`);
+}
+
 export function registerFormViewCommands(program: Command, registry: EnvironmentRegistry): void {
   // ─── FORMS ─────────────────────────────────────────────────────────────────
 
@@ -37,6 +67,26 @@ export function registerFormViewCommands(program: Command, registry: Environment
         fileName: `form-${formId}-fields`,
         data: fields,
         summary: [`Form ${formId} has ${fields.length} fields:`, ...fields.map(f => `  ${f}`)].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('entity-form-fields-by-name <entityName> <formName>')
+    .description('List fields currently on a Dataverse form by form name')
+    .option('--type <n>', 'Form type: 2=Main, 5=QuickView, 6=QuickCreate, 7=Dashboard')
+    .action(async (entityName: string, formName: string, opts: { type?: string }, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFormViewService();
+      const type = opts.type ? parseInt(opts.type, 10) : undefined;
+
+      const forms = await service.getEntityForms(entityName, type);
+      const form = resolveSingleByName(forms, formName, 'form');
+      const fields = await service.getFormFields(form.formid);
+
+      outputResult({
+        fileName: `form-${form.formid}-fields`,
+        data: { formId: form.formid, formName: form.name, fields },
+        summary: [`Form '${form.name}' (${form.formid}) has ${fields.length} fields:`, ...fields.map(f => `  ${f}`)].join('\n'),
       }, ctx.environmentName);
     });
 
@@ -92,6 +142,39 @@ export function registerFormViewCommands(program: Command, registry: Environment
         fileName: `${entityName}-views`,
         data: views,
         summary: [`Found ${views.length} views for '${entityName}':`, viewList].filter(Boolean).join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('entity-view-fields <viewId>')
+    .description('List columns currently in a Dataverse view')
+    .action(async (viewId: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFormViewService();
+      const columns = await service.getViewColumns(viewId);
+
+      outputResult({
+        fileName: `view-${viewId}-columns`,
+        data: columns,
+        summary: [`View ${viewId} has ${columns.length} columns:`, ...columns.map(c => `  ${c}`)].join('\n'),
+      }, ctx.environmentName);
+    });
+
+  program
+    .command('entity-view-fields-by-name <entityName> <viewName>')
+    .description('List columns currently in a Dataverse view by view name')
+    .action(async (entityName: string, viewName: string, _opts: unknown, command: Command) => {
+      const ctx = registry.getContext(command.optsWithGlobals().env);
+      const service = ctx.getFormViewService();
+
+      const views = await service.getEntityViews(entityName);
+      const view = resolveSingleByName(views, viewName, 'view');
+      const columns = await service.getViewColumns(view.savedqueryid);
+
+      outputResult({
+        fileName: `view-${view.savedqueryid}-columns`,
+        data: { viewId: view.savedqueryid, viewName: view.name, columns },
+        summary: [`View '${view.name}' (${view.savedqueryid}) has ${columns.length} columns:`, ...columns.map(c => `  ${c}`)].join('\n'),
       }, ctx.environmentName);
     });
 

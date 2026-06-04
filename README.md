@@ -40,6 +40,104 @@ docker pull ghcr.io/michsob/powerplatform-cli
 docker run --env-file .env ghcr.io/michsob/powerplatform-cli entity-attributes account
 ```
 
+## HTTP API (Copilot Studio)
+
+This repo now includes a small REST layer on top of the existing services so it can be consumed through a Copilot Studio Custom Connector.
+
+### Run Locally
+
+```bash
+npm install
+npm run build
+npm run start:http
+```
+
+Default port is `8080` (override with `PORT`).
+
+### Entra ID (OAuth2) Configuration
+
+Set these variables for API token validation:
+
+```bash
+API_AUTH_REQUIRED=true
+API_AUTH_TENANT_ID=<your-tenant-guid>
+API_AUTH_AUDIENCE=api://<your-api-app-id-or-uri>
+# optional override
+# API_AUTH_ISSUER=https://login.microsoftonline.com/<tenant-guid>/v2.0
+```
+
+When `API_AUTH_REQUIRED=false`, the API runs without JWT validation (local dev only).
+
+### Available REST Endpoints (v1)
+
+- `GET /health`
+- `GET /openapi.json`
+- `GET /v1/entities/{entityName}/metadata`
+- `GET /v1/entities/{entityName}/attributes`
+- `GET /v1/entities/{entityName}/attributes/{attributeName}`
+- `GET /v1/entities/{entityName}/relationships`
+- `POST /v1/records/query`
+- `GET /v1/records/{entityNamePlural}/{recordId}`
+- `POST /v1/records/{entityNamePlural}`
+- `PATCH /v1/records/{entityNamePlural}/{recordId}`
+- `DELETE /v1/records/{entityNamePlural}/{recordId}`
+- `GET /v1/solutions`
+- `GET /v1/solutions/{uniqueName}`
+- `GET /v1/solutions/{uniqueName}/components`
+- `POST /v1/solutions/export`
+
+Every endpoint supports selecting a configured Dataverse environment using either:
+
+- query string `?environment=DEV`
+- JSON body field `environment`
+- request header `x-powerplatform-environment`
+
+### Docker Image (HTTP API)
+
+```bash
+docker build -f Dockerfile.api -t powerplatform-http-api .
+docker run -p 8080:8080 --env-file .env powerplatform-http-api
+```
+
+### Deploy to Azure Container Apps
+
+1. Create an Entra app registration for the API and expose a scope / audience.
+2. Build and deploy the API container:
+
+```powershell
+./deploy/container-apps/deploy-http-api.ps1 `
+  -SubscriptionId <sub-id> `
+  -ResourceGroup <rg-name> `
+  -Location <location> `
+  -ContainerAppEnv <aca-env-name> `
+  -ContainerAppName <aca-app-name> `
+  -AcrName <acr-name> `
+  -ImageTag v1 `
+  -ApiAuthTenantId <tenant-guid> `
+  -ApiAuthAudience api://<api-app-id-or-uri>
+```
+
+3. Set all `POWERPLATFORM_*` variables on the Container App (prefer secrets for client secrets).
+4. Confirm OpenAPI is reachable at `https://<app-fqdn>/openapi.json`.
+
+### Copilot Studio Custom Connector
+
+1. In Copilot Studio / Power Platform, create a **Custom Connector**.
+2. Import OpenAPI from `https://<your-api-fqdn>/openapi.json`.
+3. Configure OAuth 2.0 with Microsoft Entra ID:
+   - Authorization URL: `https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/authorize`
+   - Token URL: `https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token`
+   - Scope: `api://<api-app-id-or-uri>/.default`
+4. Create a connector connection and test operations.
+5. In your Copilot Studio agent, add connector actions as tools.
+
+Recommended first tools:
+
+- `getEntityAttributes`
+- `queryRecords`
+- `getSolution`
+- `getSolutionComponents`
+
 ## Configuration
 
 The tool supports **multiple environments**. Define them via environment variables:
@@ -355,6 +453,9 @@ set-entity-icon <entityName> <svgFilePath>  [--solution <name>] [--web-resource-
 ```
 entity-forms <entityName>                  [--type <n>]
 entity-form-fields <formId>
+entity-form-fields-by-name <entityName> <formName>      [--type <n>]
+entity-view-fields <viewId>
+entity-view-fields-by-name <entityName> <viewName>
 add-form-field <entityName> <formId> <attributeName>
 remove-form-field <entityName> <formId> <attributeName>
 entity-views <entityName>

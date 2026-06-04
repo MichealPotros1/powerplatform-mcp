@@ -69,7 +69,11 @@ export class PowerPlatformClient {
         this.tokenExpirationTime = result.expiresOn.getTime() - (5 * 60 * 1000);
       }
 
-      return this.accessToken;
+      const token = this.accessToken;
+      if (!token) {
+        throw new Error('Failed to cache access token');
+      }
+      return token;
     } catch (error) {
       console.error('Error acquiring access token:', error);
       throw new Error('Authentication failed');
@@ -102,7 +106,11 @@ export class PowerPlatformClient {
         this.managementTokenExpirationTime = result.expiresOn.getTime() - (5 * 60 * 1000);
       }
 
-      return this.managementAccessToken;
+      const token = this.managementAccessToken;
+      if (!token) {
+        throw new Error('Failed to cache management access token');
+      }
+      return token;
     } catch (error) {
       console.error('Error acquiring management access token:', error);
       throw new Error('Management API authentication failed');
